@@ -422,6 +422,8 @@ $@"{{
             configJsonJson.general.defaultDomain = ExecutionContext.Instance.ProjectConfig.DefaultDomain;
             configJsonJson.general.environmentName = ExecutionContext.Instance.ProjectConfig.EnvironmentName;
             configJsonJson.version = $"{ExecutionContext.Instance.ProjectConfig.ProjectName} $(Build.BuildNumber) - {mesVersion}";
+            // we insert this token as a literal string, because it will be replaced at runtime when MES loads the customization
+            configJsonJson.cacheId = "$(INSTALLATION_ID)";
             configJsonStr = JsonConvert.SerializeObject(configJsonJson, Formatting.Indented);
             this.fileSystem.File.WriteAllText(configJsonPath, configJsonStr);
             Log.Verbose("Updated config.json");
