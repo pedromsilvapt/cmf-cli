@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Text.RegularExpressions;
 using Cmf.CLI.Core;
 using Cmf.CLI.Core.Interfaces;
 using Cmf.CLI.Core.Objects;
 using Cmf.CLI.Core.Repository.Credentials;
+using Cmf.CLI.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.TemplateEngine.Utils;
 using SMBLibrary;
@@ -15,12 +18,14 @@ namespace Core.Objects
 {
     public class CIFSClient : ICIFSClient
     {
+
         public string Server { get; private set; }
         public List<SharedFolder> SharedFolders { get; private set; }
-        public bool IsConnected { get; private set; }
+        public bool IsConnected => _isConnected.Value;
 
         private ISMBClient _smbClient;
         private ICredential _credentials;
+        protected Lazy<bool> _isConnected;
 
         [Obsolete("Only one share per CIFSClient is supported now. Remove this and refactor the rest of the code.")]
         public CIFSClient(string server, IEnumerable<Uri> uris, ISMBClient smbClient = null) : this(uris.Single())
@@ -31,38 +36,35 @@ namespace Core.Objects
             var authStore = ExecutionContext.ServiceProvider.GetService<IRepositoryAuthStore>();
 
             Server = uri.Host;
+            
             _smbClient = smbClient ?? new SMB2Client();
             _credentials = authStore.GetCredentialsFor<CIFSRepositoryCredentials>(authStore.GetOrLoad().GetAwaiter().GetResult(), uri.AbsoluteUri);
+            _isConnected = new Lazy<bool>(ConnectInternal);
 
-            if (_credentials == null)
-            {
-                Log.Warning($"CIFS credentials not found for shares: {uri}.");
-            }
-            else
-            {
-                Connect();
-
-                if (IsConnected)
-                {
-                    SharedFolders = [];
-                    SharedFolders.Add(new SharedFolder(uri, _smbClient));
-                }
-            }
+            SharedFolders = [];
+            SharedFolders.Add(new SharedFolder(uri, _smbClient));
         }
 
-        public void Connect()
+        protected bool ConnectInternal()
         {
+            if (_credentials == null)
+            {
+                Log.Warning($"CIFS credentials not found for shares: {string.Join(", ", SharedFolders.Select(s => s.Uri))}.");
+                return false;
+            }
+
             if (_credentials is not BasicCredential basicCredential)
             {
                 throw new InvalidAuthTypeException(_credentials);
             }
 
             Log.Debug($"Connecting to SMB server {Server} with username {basicCredential.Username}");
-            IsConnected = _smbClient.Connect(Server, SMBTransportType.DirectTCPTransport);
-            if (!IsConnected)
+            var isConnected = _smbClient.Connect(Server, SMBTransportType.DirectTCPTransport);
+            if (!isConnected)
             {
                 Log.Debug($"Failed to connect to {Server}");
                 Log.Warning($"Failed to connect to {Server}");
+                return false;
             }
 
             var status = _smbClient.Login(basicCredential.Domain, basicCredential.Username, basicCredential.Password);
@@ -70,12 +72,28 @@ namespace Core.Objects
             {
                 Log.Debug($"Fail status {status}");
                 Log.Warning($"Failed to login to {Server} with username {basicCredential.Username}");
+                return false;
             }
+
+            foreach (var share in SharedFolders)
+            {
+                share.Load();
+            }
+
+            return true;
+        }
+
+        public void Connect()
+        {
+            // Since this is a Lazy<> instance, it will either trigger the connect method, if not yet connected, or
+            // do nothing if already connected
+            var _ = _isConnected.Value;
         }
 
         public void Disconnect()
         {
             _smbClient.Disconnect();
+            _isConnected = new Lazy<bool>(ConnectInternal);
         }
     }
 
@@ -89,17 +107,18 @@ namespace Core.Objects
         private string _path { get; set; }
         private Uri _uri { get; set; }
 
+        public Uri Uri => _uri;
+
         public SharedFolder(Uri uri, ISMBClient client)
         {
             _client = client;
             _server = uri.Host;
             _share = uri.PathAndQuery.Split("/")[1];
-            _path = uri.PathAndQuery.Replace($"/{_share}", "").Substring(1);
+            _path = uri.PathAndQuery.Substring(_share.Length + 1).TrimStart('/');
             _uri = uri;
-            Load();
         }
 
-        private void Load()
+        public void Load()
         {
             _smbFileStore = _client.TreeConnect(_share, out NTStatus status);
             if (status != NTStatus.STATUS_SUCCESS)

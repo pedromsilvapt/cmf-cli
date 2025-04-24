@@ -92,6 +92,7 @@ namespace tests.Specs
             _mockSmbClient.Setup(client => client.TreeConnect(It.IsAny<string>(), out It.Ref<NTStatus>.IsAny)).Returns(mockFileStore.Object);
 
             var sharedFolder = new SharedFolder(new Uri(@"\\testServer\testShare\Folder"), _mockSmbClient.Object);
+            sharedFolder.Load();
 
             // Act
             var result = sharedFolder.GetFile("testFile.txt");
