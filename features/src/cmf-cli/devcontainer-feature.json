@@ -1,0 +1,16 @@
+{
+    "name": "cmf cli",
+    "id": "cmf-cli",
+    "version": "1.0.0",
+    "description": "Installs @criticalmanufacturing/cli package globally inside the devcontainer",
+    "options": {
+        "version": {
+            "type": "string",
+            "default": "latest",
+            "description": "The NPM tag to use when install the "
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}

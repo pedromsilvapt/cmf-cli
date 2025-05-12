@@ -1,0 +1,16 @@
+{
+    "install-latest": {
+        "image": "node",
+        "features": {
+            "cmf-cli": {}
+        }
+    },
+    "install-specific-version": {
+        "image": "node",
+        "features": {
+            "cmf-cli": {
+                "version": "5.2.0"
+            }
+        }
+    }
+}
