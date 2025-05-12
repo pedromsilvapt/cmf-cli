@@ -105,6 +105,7 @@ namespace Cmf.CLI.Core.Services
                 {
                     RepositoryType = repositoryType.RepositoryType,
                     Repository = repository,
+                    Key = GetEnvironmentVariable($"{envVarPrefix}__KEY", repositoryType.KeyPropertyRequirement),
                     Token = GetEnvironmentVariable($"{envVarPrefix}__TOKEN", PropertyRequirement.Mandatory),
                 },
                 "basic" => new BasicCredential
