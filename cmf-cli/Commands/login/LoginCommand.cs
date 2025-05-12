@@ -81,6 +81,10 @@ namespace Cmf.CLI.Commands
                 description: "If true, the credentials are stord on the .cmf-auth.json file, but are not applied to the credentials file of the tool (NPM, NuGet, Docker, etc...)"
             ));
             cmd.AddOption(new Option<bool>(
+                aliases: new[] { "--print-env-vars" },
+                description: "If true, prints the environment variables that could be used to configure the credentials just entered. Credentials will not be saved and will not be synced."
+            ));
+            cmd.AddOption(new Option<bool>(
                 aliases: new[] { "--no-prompt" },
                 description: "Do not display any interactive prompts. If a prompt was needed, an error will be raised instead"
             ));
@@ -92,15 +96,15 @@ namespace Cmf.CLI.Commands
         /// <summary>
         /// Synchronous wrapper for the command
         /// </summary>
-        internal void Execute(RepositoryCredentialsType? repositoryType, string repository, AuthType? authType, string token, string username, string password, string domain, string key, bool storeOnly, bool noPrompt)
+        internal void Execute(RepositoryCredentialsType? repositoryType, string repository, AuthType? authType, string token, string username, string password, string domain, string key, bool storeOnly, bool printEnvVars, bool noPrompt)
         {
-            ExecuteAsync(repositoryType, repository, authType, token, username, password, domain, key, storeOnly, noPrompt).GetAwaiter().GetResult();
+            ExecuteAsync(repositoryType, repository, authType, token, username, password, domain, key, storeOnly, printEnvVars, noPrompt).GetAwaiter().GetResult();
         }
 
         /// <summary>
         /// Execute the command
         /// </summary>
-        internal async Task ExecuteAsync(RepositoryCredentialsType? repositoryType, string repository, AuthType? authType, string token, string username, string password, string domain, string key, bool storeOnly, bool noPrompt)
+        internal async Task ExecuteAsync(RepositoryCredentialsType? repositoryType, string repository, AuthType? authType, string token, string username, string password, string domain, string key, bool storeOnly, bool printEnvVars, bool noPrompt)
         {
             using var activity = ExecutionContext.ServiceProvider?.GetService<ITelemetryService>()?.StartExtendedActivity(this.GetType().Name);
 
@@ -197,8 +201,20 @@ namespace Cmf.CLI.Commands
                 }
             }
 
-            // Store the credentials on the auth
-            await authStore.Save([credentials], sync: !storeOnly);
+            if (printEnvVars)
+            {
+                var envVars = authStore.GenerateEnvironmentVariables([credentials]);
+
+                foreach (var (name, value) in envVars)
+                {
+                    Console.WriteLine("{0}={1}", name, value);
+                }
+            }
+            else
+            {
+                // Store the credentials on the auth
+                await authStore.Save([credentials], sync: !storeOnly);
+            }
         }
 
         internal string Prompt(string label, bool noPrompt)

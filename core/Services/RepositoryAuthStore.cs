@@ -305,6 +305,67 @@ namespace Cmf.CLI.Core.Services
             return _cachedAuthFile;
         }
 
+        public IList<(string Name, string Value)> GenerateEnvironmentVariables(IList<ICredential> credentials, bool derived = true)
+        {
+            if (!credentials.Any())
+            {
+                return [];
+            }
+
+            var credentialsByRepo = GroupWithRepository(credentials);
+
+            // Make sure all credentials are valid
+            foreach (var (repoType, repoCredentials) in credentialsByRepo)
+            {
+                repoType.ValidateCredentials(repoCredentials);
+            }
+
+            var envVars = new List<(string Name, string Value)>();
+
+            foreach (var (repoType, repoCredentials) in credentialsByRepo)
+            {
+                foreach (var cred in repoCredentials)
+                {
+                    var envVarPrefix = repoType.GetEnvironmentVariablePrefix(cred.Repository);
+
+                    envVars.Add(($"{envVarPrefix}__AUTH_TYPE", cred.AuthType.ToString()));
+
+                    if (!string.IsNullOrEmpty(cred.Key))
+                    {
+                        envVars.Add(($"{envVarPrefix}__KEY", cred.Key));
+                    }
+
+                    if (cred is BasicCredential basicCred)
+                    {
+                        if (!string.IsNullOrEmpty(basicCred.Domain))
+                        {
+                            envVars.Add(($"{envVarPrefix}__DOMAIN", basicCred.Domain));
+                        }
+
+                        envVars.Add(($"{envVarPrefix}__USERNAME", basicCred.Username));
+                        envVars.Add(($"{envVarPrefix}__PASSWORD", basicCred.Password));
+                    }
+                    else if (cred is BearerCredential bearerCred)
+                    {
+                        envVars.Add(($"{envVarPrefix}__TOKEN", bearerCred.Token));
+                    }
+                }
+
+                if (derived && repoType is IRepositoryCredentialsSingleSignOn singleSignOnRepository)
+                {
+                    envVars.AddRange(
+                        GenerateEnvironmentVariables(
+                            singleSignOnRepository.GetDerivedCredentials(repoCredentials).ToList(),
+                            derived: false
+                        )
+                    );
+                }
+            }
+
+            return envVars;
+        }
+
+
         public async Task Save(IList<ICredential> credentials, bool sync = true)
         {
             if (!credentials.Any())

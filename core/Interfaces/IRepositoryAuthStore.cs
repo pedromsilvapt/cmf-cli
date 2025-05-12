@@ -27,7 +27,15 @@ namespace Cmf.CLI.Core.Interfaces
         /// </summary>
         /// <returns></returns>
         Task<CmfAuthFile> GetOrLoad();
-
+        
         Task Save(IList<ICredential> credentials, bool sync = true);
+
+        /// <summary>
+        /// Returns a list with the environment variables that would be necessary to configure the following credentials.
+        /// </summary>
+        /// <param name="credentials"></param>
+        /// <param name="derived"></param>
+        /// <returns></returns>
+        IList<(string Name, string Value)> GenerateEnvironmentVariables(IList<ICredential> credentials, bool derived = true);
     }
 }
