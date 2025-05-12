@@ -138,6 +138,11 @@ namespace Cmf.CLI.Commands
                     throw new CliException($"Repository type \"{repositoryCredentials.RepositoryType}\" does not support any authentication method, please report this issue.");
                 }
 
+                if (!string.IsNullOrEmpty(token) && Enum.TryParse<AuthType>(token, ignoreCase: true, out var _))
+                {
+                    Log.Warning($"Noticed that you specified a token value as \"-t {token}\". If you meant to specify the auth type, use \"-T {token}\" instead.");
+                }
+
                 // This can happen, if the repo supports multiple auth types, and the user did not provide one
                 if (supportedAuthTypes.Length > 1 && authType == null)
                 {
