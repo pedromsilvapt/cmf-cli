@@ -57,6 +57,8 @@ public class LinkLBOsCommand : BaseCommand
         Log.Debug($"Checking if {tsLBOsPath} exists...");
         if (fileSystem.Directory.Exists(tsLBOsPath))
         {
+            RemoveNodeModules(tsLBOsPath);
+
             var tsLBOsDir = fileSystem.DirectoryInfo.New(tsLBOsPath);
             new NPMCommand()
             {
@@ -72,6 +74,8 @@ public class LinkLBOsCommand : BaseCommand
                 Args = new[] { "build" },
                 WorkingDirectory = tsLBOsDir
             }.Exec()?.Wait();
+
+            RemoveNodeModules(tsLBOsPath);
             
             var packageRoot = cmfPackage.GetFileInfo().DirectoryName;
             var linkTargetPath = this.fileSystem.Path.Join(packageRoot, "node_modules", "cmf-lbos");
@@ -89,6 +93,22 @@ public class LinkLBOsCommand : BaseCommand
         {
             // if there are no LBOs we don't need to do anything
             Log.Verbose($"Path '{tsLBOsPath}' does not exist, not doing anything.");
+        }
+    }
+
+    internal void RemoveNodeModules(string typescriptLbosFolder)
+    {
+        // var typescriptLbosFolder = fileSystem.Path.Join(root.FullName, "Libs", "LBOs", "TypeScript");
+        var packageLock = fileSystem.FileInfo.New(fileSystem.Path.Join(typescriptLbosFolder, "package-lick.json"));
+        if (packageLock.Exists)
+        {
+            packageLock.Delete();
+        }
+
+        var nodeModules = fileSystem.DirectoryInfo.New(fileSystem.Path.Join(typescriptLbosFolder, "node_modules"));
+        if (nodeModules.Exists)
+        {
+            nodeModules.Delete(recursive: true);
         }
     }
 }
